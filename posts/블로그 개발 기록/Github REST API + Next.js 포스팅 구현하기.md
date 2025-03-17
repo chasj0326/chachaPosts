@@ -3,7 +3,7 @@
 
 ---
 
-## [`Octokit`](https://docs.github.com/ko/rest/guides/scripting-with-the-rest-api-and-javascript?apiVersion=2022-11-28)
+## Octokit
 
 - Github REST API 요청을 간단하게 만들어주는 라이브러리이다.
 - 요청 url 을 ".../github/api/...." 이렇게 직접 다 작성하지 않아도 되며, response 타입과 requestBody 타입이 지정되어 있기 때문에 개발시간이 매우 단축되었다.
