@@ -185,4 +185,3 @@ const updatedUTC = data[0].commit.author?.date; // 처음값 = 최근시간
 물론 **UTC 기준**으로 되어있기 때문에, 변환해서 response 를 반환하였다. js 에서는 Date 인스턴스로 생성하게 되면 (`new Date(createdUTC)`) 브라우저 시간에 맞게 변경된다.
 
 ---
-
