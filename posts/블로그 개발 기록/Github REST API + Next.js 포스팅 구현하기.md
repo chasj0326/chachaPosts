@@ -39,6 +39,7 @@ Next.js API 라우트 기능을 활용하여 서버 로직을 작성하였다.
 - 게다가, github 는 블로그 전용 서비스가 아니기 때문에 파싱이나 인코딩/디코딩 작업이 꽤 이루어져야 했다. 이러한 로직들을 화면과 분리하고 싶었다.
 
 
+
 ### 포스트 생성
 
 포스트 생성은 새 파일을 커밋 + 푸시하는 것과 동일하다.
@@ -54,6 +55,7 @@ path 는 어떻게 요청하느냐에 따라 폴더 두개를 뚝딱 생성할 �
 
 
 ```js
+// api/posts/route.ts
 // POST (equest: NextRequest, { params }: PostPathParams)
 
 const body = (await request.json()) as PostCreateRequestBody;
@@ -77,6 +79,8 @@ const { data } = await octokit.rest.repos.createOrUpdateFileContents({
 ```
 클라이언트에서 `POST .../dir1/dir2/title` 요청이 온다면, 깃헙 저장소에는 dir1/dir2 경로에 title.md 파일이 저장되는 것이다.
 
+<br/>
+
 ### 포스트 조회
 
 path 로 파일을 저장한 것처럼, git api 는 path 에 해당하는 파일을 반환한다.
@@ -85,6 +89,7 @@ path 로 파일을 저장한 것처럼, git api 는 path 에 해당하는 파일
 포스트(파일) 조회는 owner, repo, path 만 보내주면 된다.
 
 ```js
+// api/posts/route.ts
 // GET (equest: NextRequest, { params }: PostPathParams)
 
 const path = joinPathWithExtention((await params).path);
@@ -100,6 +105,7 @@ const { data } = octokit.rest.repos.getContent({
 - 저기서 얻어지는 data 는 매우매우 방대하다. 이후에 필요한 값만 반환해주었다. 
 (title, content, sha ...)
 
+<br/>
 
 ### 포스트 수정 & 삭제
 
@@ -112,6 +118,7 @@ const { data } = octokit.rest.repos.getContent({
 #### 수정하기
 
 ```js
+// api/posts/route.ts
 // PUT (equest: NextRequest, { params }: PostPathParams)
 
 const body = (await request.json()) as PostCreateRequestBody;
@@ -139,6 +146,7 @@ await octokit.rest.repos.createOrUpdateFileContents({
 #### 삭제하기
 
 ```js
+// api/posts/route.ts
 // DELETE(request: NextRequest, { params }: PostPathParams)
 // 생략
 await octokit.rest.repos.deleteFile({
@@ -149,4 +157,32 @@ await octokit.rest.repos.deleteFile({
   message: `delete post: ${removePathExtention(fileData.name)}`,
 });
 ```
+
+<br/>
+
+### 부가기능 : createdAt, updatedAt 얻기
+
+당연히 getContent 응답에 파일의 createdAt, updatedAt 이 있을 줄 알았다..! 
+하지만 없기 때문에, **파일의 커밋리스트로부터 시간 데이터를 얻어오기**로 했다.
+
+```js
+// api/time/route.ts
+// GET(request: NextRequest)
+const searchParams = request.nextUrl.searchParams;
+const path = searchParams.get("path"); // time?path={path}
+
+const { data } = return octokit.rest.repos.listCommits({
+  owner,
+  repo,
+  path,
+});
+
+const createdUTC = data.at(-1)?.commit.author?.date; // 마지막값 = 생성시간
+const updatedUTC = data[0].commit.author?.date; // 처음값 = 최근시간
+
+```
+
+물론 **UTC 기준**으로 되어있기 때문에, 변환해서 response 를 반환하였다. js 에서는 Date 인스턴스로 생성하게 되면 (`new Date(createdUTC)`) 브라우저 시간에 맞게 변경된다.
+
+---
 
