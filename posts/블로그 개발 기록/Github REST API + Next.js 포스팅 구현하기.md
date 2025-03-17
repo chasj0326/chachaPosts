@@ -38,19 +38,115 @@ Next.js API 라우트 기능을 활용하여 서버 로직을 작성하였다.
 
 - 게다가, github 는 블로그 전용 서비스가 아니기 때문에 파싱이나 인코딩/디코딩 작업이 꽤 이루어져야 했다. 이러한 로직들을 화면과 분리하고 싶었다.
 
+
+### 포스트 생성
+
+포스트 생성은 새 파일을 커밋 + 푸시하는 것과 동일하다.
+- owner : 저장소 주인 = 내 아이디
+
+- repo : 저장소 이름
+- path : 저장 경로
+- message : 커밋 메시지
+- content : 글 (텍스트 인코딩 필요)
+
+path 는 어떻게 요청하느냐에 따라 폴더 두개를 뚝딱 생성할 수 있다.
+`posts/direc1/direc2/title.md` 라면 저장소 폴더 3겹 안에 해당 파일이 생성된다.
+
+
 ```js
-async function handleGet(req, res) {
-  const { path } = req.query;
-  try {
-    const response = await octokit.rest.repos.getContent({
-      owner: process.env.GITHUB_REPO_OWNER,
-      repo: process.env.GITHUB_REPO,
-      path,
-    });
-    const content = Buffer.from(response.data.content, 'base64').toString('utf8');
-    res.status(200).json({ content });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-}
+// POST (equest: NextRequest, { params }: PostPathParams)
+
+const body = (await request.json()) as PostCreateRequestBody;
+const { title, content } = body;
+
+// 클라이언트에서 온 url parameter 로 저장경로 만들기
+const dir = joinPath((await params).path);
+// 저장경로에는 파일명과 확장자도 포함되어야 한다
+const path = `posts/${joinPathWithExtention([dir, title])}`;
+// 파일 내용 인코딩
+const encodedContent = Buffer.from(content, "utf-8").toString("base64");
+
+const { data } = await octokit.rest.repos.createOrUpdateFileContents({
+  owner,
+  repo,
+  path,
+  content: encodedContent,
+  message: `create post: ${title}`,
+});
+
 ```
+클라이언트에서 `POST .../dir1/dir2/title` 요청이 온다면, 깃헙 저장소에는 dir1/dir2 경로에 title.md 파일이 저장되는 것이다.
+
+### 포스트 조회
+
+path 로 파일을 저장한 것처럼, git api 는 path 에 해당하는 파일을 반환한다.
+이 기능들에서는 모든 속성 중에 path 값이 제일 중요하며, 거의 파일의 id 역할을 한다.
+
+포스트(파일) 조회는 owner, repo, path 만 보내주면 된다.
+
+```js
+// GET (equest: NextRequest, { params }: PostPathParams)
+
+const path = joinPathWithExtention((await params).path);
+const { data } = octokit.rest.repos.getContent({
+  owner,
+  repo,
+  path,
+});
+```
+
+- 중첩 파라미터의 경우, handler 로 들어오는 params.path 는 문자열 배열이다. 따라서 합치고 확장자를 추가하는걸 꼭 해주어야 한다. 예시에서는 joinPathWithExtention 유틸이다.
+
+- 저기서 얻어지는 data 는 매우매우 방대하다. 이후에 필요한 값만 반환해주었다. 
+(title, content, sha ...)
+
+
+### 포스트 수정 & 삭제
+
+수정은 생성 코드랑 거의 동일하지만, 생성이나 조회처럼 path 값만으로는 불가능하다. 
+
+최근의 파일 응답에서 온 `sha` 라는 값을 함께 넣어주어야 한다. 
+깃허브는 버전 관리를 해주는 서비스이기 때문에, 수정 또는 삭제 = 최신 작업 id 를 가져와서 적용하기 라고 생각해야 한다.
+
+
+#### 수정하기
+
+```js
+// PUT (equest: NextRequest, { params }: PostPathParams)
+
+const body = (await request.json()) as PostCreateRequestBody;
+// 클라이언트에서는 파일의 sha 를 넣어서 요청
+const { title, content, sha } = body; 
+
+// 클라이언트에서 온 url parameter 로 저장경로 만들기
+const dir = joinPath((await params).path);
+// 저장경로에는 파일명과 확장자도 포함되어야 한다
+const path = `posts/${joinPathWithExtention([dir, title])}`;
+// 파일 내용 인코딩
+const encodedContent = Buffer.from(content, "utf-8").toString("base64");
+
+await octokit.rest.repos.createOrUpdateFileContents({
+  owner,
+  repo,
+  path,
+  content: encodedContent,
+  message: `update post: ${title}`,
+  sha,
+});
+
+```
+
+#### 삭제하기
+
+```js
+// DELETE(request: NextRequest, { params }: PostPathParams)
+// 생략
+await octokit.rest.repos.deleteFile({
+  owner,
+  repo,
+  path,
+  sha,
+  message: `delete post: ${removePathExtention(fileData.name)}`,
+});
+```
+
