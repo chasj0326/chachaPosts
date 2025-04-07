@@ -1,4 +1,4 @@
-<!--|tags:Next.js Octokit|-->
+<!--|tags:Next.js Octokit|commentsId:11|-->
 `Next.js` 와 `Github REST API` 를 활용하여 포스트 생성/수정/삭제/조회 기능을 구현한 부분을 기록하고자 한다.
 
 ---
